@@ -31,10 +31,36 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
 app.use(logger('dev'));
-app.use(express.json());
+app.use(express.json()); //like body parser
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+
+// this is where we add authentication
+function auth(req, res, next) {
+  console.log(req.headers);
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+      const err = new Error('You are not authenticated!');
+      res.setHeader('WWW-Authenticate', 'Basic');
+      err.status = 401;
+      return next(err);
+  }
+// buffer is a global node class, from(static method) to decode User/pass. Takes auth header and extract user and pass and puts into auth array as 1 and 2 items.
+const auth = Buffer.from(authHeader.split(' ')[1], 'base64').toString().split(':');
+const user = auth[0];
+const pass = auth[1];
+if (user === 'admin' && pass === 'password') {
+    return next(); // authorized
+} else {
+    const err = new Error('You are not authenticated!');
+    res.setHeader('WWW-Authenticate', 'Basic');      
+    err.status = 401;
+    return next(err);
+}
+}
+
+app.use(auth);
+app.use(express.static(path.join(__dirname, 'public')));//users access data
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
