@@ -4,6 +4,7 @@ const User = require('./models/user');;//has access to passportlocal
 const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;//helper methods
 const jwt = require('jsonwebtoken'); //create sign verify tokens
+const FacebookTokenStrategy = require('passport-facebook-token');
 
 const config = require('./config.js');//has secretKey
 
@@ -54,3 +55,34 @@ exports.verifyAdmin = (req, res, next) =>{
         return next(err)
     }
 }
+//checks is user exists return user doc. if not create new user doc from fb profile
+exports.FacebookTokenStrategy = passport.use(
+    new FacebookTokenStrategy(
+        {
+            clientID: config.facebook.clientId,
+            clientSecret: config.facebook.clientSecret
+        },
+        (accessToken, refreshToken, profile, done) => {//verifycallback
+            User.findOne({facebookId: profile.id}, (err, user) => {
+                if (err) {
+                    return done(err, false);
+                }
+                if (!err && user) {
+                    return done(null, user);
+                } else {
+                    user = new User({ username: profile.displayName });
+                    user.facebookId = profile.id;
+                    user.firstname = profile.name.givenName;
+                    user.lastname = profile.name.familyName;
+                    user.save((err, user) => {
+                        if (err) {
+                            return done(err, false)
+                        } else {
+                            return done(null, user);
+                        }
+                    });
+                }
+            });
+        }
+    )
+)
